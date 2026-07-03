@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hr
+      POSTGRES_PASSWORD: hr
+      POSTGRES_DB: hr_control
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hr -d hr_control"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # DB faqat ichki tarmoqda (bot bilan). Serverda tashqariga ochmaymiz.
+    # Lokalda psql kerak bo'lsa: `docker compose exec db psql -U hr -d hr_control`.
+    restart: unless-stopped
+
+  bot:
+    build: .
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    # seed = jadval yaratish + namuna ma'lumot (idempotent), keyin bot
+    command: sh -c "python -m scripts.seed && python -m app.main"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
