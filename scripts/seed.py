@@ -45,7 +45,7 @@ async def main() -> None:
         if schedule is None:
             schedule = WorkSchedule(
                 name="10:00–19:00", start_time=dt.time(10, 0), end_time=dt.time(19, 0),
-                grace_minutes=5, workdays="1,2,3,4,5",
+                grace_minutes=5, workdays="1,2,3,4,5,6",  # Dush–Shan (Yakshanba dam)
             )
             s.add(schedule)
         await s.flush()
