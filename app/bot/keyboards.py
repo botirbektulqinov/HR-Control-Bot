@@ -44,6 +44,7 @@ def language_inline() -> InlineKeyboardMarkup:
 def admin_menu(lang: str, is_super: bool = False) -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(text=t(lang, "admin_reports"))],
+        [KeyboardButton(text=t(lang, "admin_add_employee"))],
         [KeyboardButton(text=t(lang, "admin_reset_link"))],
     ]
     if is_super:

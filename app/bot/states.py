@@ -14,3 +14,6 @@ class AdminFlow(StatesGroup):
     report_range = State()
     reset_jshshir = State()
     addhr_jshshir = State()
+    add_emp_name = State()
+    add_emp_jshshir = State()
+    add_emp_dept = State()

@@ -4,14 +4,15 @@ from zoneinfo import ZoneInfo
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, Message
+from sqlalchemy import select
 
 from app.bot.keyboards import admin_menu, main_menu, report_period_kb
 from app.bot.states import AdminFlow
 from app.config import get_settings
 from app.constants import Role
-from app.db.models import Employee
+from app.db.models import Branch, Employee, WorkSchedule
 from app.i18n import t, texts
-from app.services.auth import audit, get_by_jshshir
+from app.services.auth import audit, get_by_jshshir, is_valid_jshshir
 from app.services.reports import build_report
 
 router = Router()
@@ -139,6 +140,72 @@ async def addhr_do(message: Message, employee, lang, session, state: FSMContext,
     await audit(session, employee.id, "add_hr", emp.jshshir)
     await state.clear()
     await message.answer(t(lang, "addhr_done", name=emp.full_name),
+                         reply_markup=admin_menu(lang, _is_super(employee)))
+
+
+async def _to_admin_menu(message: Message, employee, lang, state: FSMContext):
+    await state.clear()
+    await message.answer(t(lang, "admin_menu"), reply_markup=admin_menu(lang, _is_super(employee)))
+
+
+@router.message(F.text.in_(texts("admin_add_employee")))
+async def addemp_open(message: Message, employee, lang, state: FSMContext, **_):
+    if not _is_admin(employee):
+        return
+    await state.set_state(AdminFlow.add_emp_name)
+    await message.answer(t(lang, "addemp_name"))
+
+
+@router.message(AdminFlow.add_emp_name)
+async def addemp_name(message: Message, employee, lang, state: FSMContext, **_):
+    text = (message.text or "").strip()
+    if text in texts("back"):
+        await _to_admin_menu(message, employee, lang, state)
+        return
+    await state.update_data(name=text)
+    await state.set_state(AdminFlow.add_emp_jshshir)
+    await message.answer(t(lang, "addemp_jshshir"))
+
+
+@router.message(AdminFlow.add_emp_jshshir)
+async def addemp_jshshir(message: Message, employee, lang, session, state: FSMContext, **_):
+    text = (message.text or "").strip()
+    if text in texts("back"):
+        await _to_admin_menu(message, employee, lang, state)
+        return
+    if not is_valid_jshshir(text):
+        await message.answer(t(lang, "invalid_jshshir"))
+        return
+    if await get_by_jshshir(session, text):
+        await message.answer(t(lang, "addemp_exists"))
+        return
+    await state.update_data(jshshir=text)
+    await state.set_state(AdminFlow.add_emp_dept)
+    await message.answer(t(lang, "addemp_dept"))
+
+
+@router.message(AdminFlow.add_emp_dept)
+async def addemp_dept(message: Message, employee, lang, session, state: FSMContext, **_):
+    text = (message.text or "").strip()
+    if text in texts("back"):
+        await _to_admin_menu(message, employee, lang, state)
+        return
+    branch = await session.scalar(select(Branch))
+    schedule = await session.scalar(select(WorkSchedule))
+    if branch is None or schedule is None:
+        await state.clear()
+        await message.answer(t(lang, "addemp_no_config"),
+                             reply_markup=admin_menu(lang, _is_super(employee)))
+        return
+    data = await state.get_data()
+    session.add(Employee(
+        jshshir=data["jshshir"], full_name=data["name"],
+        department=None if text == "-" else text,
+        branch_id=branch.id, schedule_id=schedule.id,
+    ))
+    await audit(session, employee.id, "add_employee", data["jshshir"])
+    await state.clear()
+    await message.answer(t(lang, "addemp_done", name=data["name"]),
                          reply_markup=admin_menu(lang, _is_super(employee)))
 
 
