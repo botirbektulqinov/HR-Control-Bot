@@ -23,7 +23,7 @@ MARKETING = [
     ("Sabirova Sarvinoz Jonibek qizi", "60507037170024"),
     ("Botirbek To'lqinov Xolmat o'g'li", "52701066040016"),
     ("Jabborqulov Otabek Ulug'bek o'g'li", "51506066390014"),
-    ("Sadullayeva Farizabonu Utkir qizi", "63110075260014"),
+    ("Sadullayeva Farizabonu Utkirovna", "63110075260014"),
 ]
 
 
