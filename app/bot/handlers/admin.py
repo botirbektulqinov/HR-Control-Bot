@@ -3,10 +3,10 @@ from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import BufferedInputFile, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy import select
 
-from app.bot.keyboards import admin_menu, main_menu, report_period_kb
+from app.bot.keyboards import admin_menu, edit_fields_kb, main_menu, report_period_kb
 from app.bot.states import AdminFlow
 from app.config import get_settings
 from app.constants import Role
@@ -207,6 +207,85 @@ async def addemp_dept(message: Message, employee, lang, session, state: FSMConte
     await state.clear()
     await message.answer(t(lang, "addemp_done", name=data["name"]),
                          reply_markup=admin_menu(lang, _is_super(employee)))
+
+
+_EDIT_FIELDS = {"name": "full_name", "dept": "department", "pos": "position"}
+
+
+def _edit_card(lang: str, emp: Employee) -> str:
+    return t(lang, "edit_card", name=emp.full_name,
+             dept=emp.department or "—", position=emp.position or "—")
+
+
+@router.message(F.text.in_(texts("admin_edit_employee")))
+async def edit_open(message: Message, employee, lang, state: FSMContext, **_):
+    if not _is_admin(employee):
+        return
+    await state.set_state(AdminFlow.edit_find)
+    await message.answer(t(lang, "edit_find"))
+
+
+@router.message(AdminFlow.edit_find)
+async def edit_find(message: Message, employee, lang, session, state: FSMContext, **_):
+    text = (message.text or "").strip()
+    if text in texts("back"):
+        await _to_admin_menu(message, employee, lang, state)
+        return
+    emp = await get_by_jshshir(session, text)
+    if emp is None:
+        await message.answer(t(lang, "not_found"))
+        return
+    await state.update_data(edit_emp_id=emp.id)
+    await state.set_state(AdminFlow.edit_menu)
+    await message.answer(_edit_card(lang, emp), reply_markup=edit_fields_kb(lang))
+
+
+@router.callback_query(F.data.startswith("editf:"))
+async def edit_pick_field(cb: CallbackQuery, lang, state: FSMContext, **_):
+    data = await state.get_data()
+    if not data.get("edit_emp_id"):
+        await cb.answer(t(lang, "edit_expired"), show_alert=True)
+        return
+    await state.update_data(edit_field=cb.data.split(":", 1)[1])
+    await state.set_state(AdminFlow.edit_value)
+    await cb.message.answer(t(lang, "edit_ask_value"))
+    await cb.answer()
+
+
+@router.callback_query(F.data == "editdone")
+async def edit_done(cb: CallbackQuery, employee, lang, state: FSMContext, **_):
+    await state.clear()
+    await cb.message.answer(t(lang, "admin_menu"),
+                            reply_markup=admin_menu(lang, _is_super(employee)))
+    await cb.answer()
+
+
+@router.message(AdminFlow.edit_value)
+async def edit_value(message: Message, employee, lang, session, state: FSMContext, **_):
+    text = (message.text or "").strip()
+    if text in texts("back"):
+        await _to_admin_menu(message, employee, lang, state)
+        return
+    data = await state.get_data()
+    emp = await session.get(Employee, data.get("edit_emp_id"))
+    field = _EDIT_FIELDS.get(data.get("edit_field"))
+    if emp is None or field is None:
+        await state.clear()
+        await message.answer(t(lang, "edit_expired"),
+                             reply_markup=admin_menu(lang, _is_super(employee)))
+        return
+    if field == "full_name":
+        if not text or text == "-":
+            await message.answer(t(lang, "edit_ask_value"))
+            return
+        value = text
+    else:
+        value = None if text == "-" else text
+    setattr(emp, field, value)
+    await audit(session, employee.id, "edit_employee", emp.jshshir, field=field)
+    await state.set_state(AdminFlow.edit_menu)
+    await message.answer(t(lang, "edit_saved"))
+    await message.answer(_edit_card(lang, emp), reply_markup=edit_fields_kb(lang))
 
 
 @router.message(F.text.in_(texts("back")))

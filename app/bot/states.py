@@ -17,3 +17,6 @@ class AdminFlow(StatesGroup):
     add_emp_name = State()
     add_emp_jshshir = State()
     add_emp_dept = State()
+    edit_find = State()
+    edit_menu = State()
+    edit_value = State()

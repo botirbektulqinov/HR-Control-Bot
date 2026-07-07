@@ -44,13 +44,23 @@ def language_inline() -> InlineKeyboardMarkup:
 def admin_menu(lang: str, is_super: bool = False) -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(text=t(lang, "admin_reports"))],
-        [KeyboardButton(text=t(lang, "admin_add_employee"))],
+        [KeyboardButton(text=t(lang, "admin_add_employee")),
+         KeyboardButton(text=t(lang, "admin_edit_employee"))],
         [KeyboardButton(text=t(lang, "admin_reset_link"))],
     ]
     if is_super:
         rows.append([KeyboardButton(text=t(lang, "admin_add_hr"))])
     rows.append([KeyboardButton(text=t(lang, "back"))])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+
+def edit_fields_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(lang, "edit_btn_name"), callback_data="editf:name"),
+         InlineKeyboardButton(text=t(lang, "edit_btn_dept"), callback_data="editf:dept")],
+        [InlineKeyboardButton(text=t(lang, "edit_btn_pos"), callback_data="editf:pos")],
+        [InlineKeyboardButton(text=t(lang, "edit_btn_done"), callback_data="editdone")],
+    ])
 
 
 def report_period_kb(lang: str) -> ReplyKeyboardMarkup:
