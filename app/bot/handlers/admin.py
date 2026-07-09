@@ -4,13 +4,19 @@ from zoneinfo import ZoneInfo
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 
-from app.bot.keyboards import admin_menu, edit_fields_kb, main_menu, report_period_kb
+from app.bot.keyboards import (
+    admin_menu,
+    delete_confirm_kb,
+    edit_fields_kb,
+    main_menu,
+    report_period_kb,
+)
 from app.bot.states import AdminFlow
 from app.config import get_settings
 from app.constants import Role
-from app.db.models import Branch, Employee, WorkSchedule
+from app.db.models import Attendance, AuditLog, Branch, Employee, WorkSchedule
 from app.i18n import t, texts
 from app.services.auth import audit, get_by_jshshir, is_valid_jshshir
 from app.services.reports import build_report
@@ -286,6 +292,65 @@ async def edit_value(message: Message, employee, lang, session, state: FSMContex
     await state.set_state(AdminFlow.edit_menu)
     await message.answer(t(lang, "edit_saved"))
     await message.answer(_edit_card(lang, emp), reply_markup=edit_fields_kb(lang))
+
+
+@router.message(F.text.in_(texts("admin_delete_employee")))
+async def delete_open(message: Message, employee, lang, state: FSMContext, **_):
+    if not _is_admin(employee):
+        return
+    await state.set_state(AdminFlow.delete_find)
+    await message.answer(t(lang, "del_find"))
+
+
+@router.message(AdminFlow.delete_find)
+async def delete_find(message: Message, employee, lang, session, state: FSMContext, **_):
+    text = (message.text or "").strip()
+    if text in texts("back"):
+        await _to_admin_menu(message, employee, lang, state)
+        return
+    emp = await get_by_jshshir(session, text)
+    if emp is None:
+        await message.answer(t(lang, "not_found"))
+        return
+    if emp.id == employee.id:
+        await message.answer(t(lang, "del_self"))
+        return
+    await state.update_data(del_emp_id=emp.id)
+    await state.set_state(AdminFlow.delete_confirm)
+    await message.answer(t(lang, "del_confirm", name=emp.full_name, jshshir=emp.jshshir),
+                         reply_markup=delete_confirm_kb(lang))
+
+
+@router.callback_query(F.data == "delyes")
+async def delete_yes(cb: CallbackQuery, employee, lang, session, state: FSMContext, **_):
+    data = await state.get_data()
+    emp = await session.get(Employee, data.get("del_emp_id"))
+    if emp is None:
+        await state.clear()
+        await cb.message.answer(t(lang, "edit_expired"),
+                                reply_markup=admin_menu(lang, _is_super(employee)))
+        await cb.answer()
+        return
+    name, jshshir = emp.full_name, emp.jshshir
+    # FK: avval davomat va audit-aktor havolalarini tozalaymiz
+    await session.execute(delete(Attendance).where(Attendance.employee_id == emp.id))
+    await session.execute(
+        update(AuditLog).where(AuditLog.actor_id == emp.id).values(actor_id=None)
+    )
+    await session.delete(emp)
+    await audit(session, employee.id, "delete_employee", jshshir)
+    await state.clear()
+    await cb.message.answer(t(lang, "del_done", name=name),
+                            reply_markup=admin_menu(lang, _is_super(employee)))
+    await cb.answer()
+
+
+@router.callback_query(F.data == "delno")
+async def delete_no(cb: CallbackQuery, employee, lang, state: FSMContext, **_):
+    await state.clear()
+    await cb.message.answer(t(lang, "cancelled"),
+                            reply_markup=admin_menu(lang, _is_super(employee)))
+    await cb.answer()
 
 
 @router.message(F.text.in_(texts("back")))

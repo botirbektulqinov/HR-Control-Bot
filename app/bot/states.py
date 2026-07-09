@@ -20,3 +20,5 @@ class AdminFlow(StatesGroup):
     edit_find = State()
     edit_menu = State()
     edit_value = State()
+    delete_find = State()
+    delete_confirm = State()

@@ -46,6 +46,7 @@ def admin_menu(lang: str, is_super: bool = False) -> ReplyKeyboardMarkup:
         [KeyboardButton(text=t(lang, "admin_reports"))],
         [KeyboardButton(text=t(lang, "admin_add_employee")),
          KeyboardButton(text=t(lang, "admin_edit_employee"))],
+        [KeyboardButton(text=t(lang, "admin_delete_employee"))],
         [KeyboardButton(text=t(lang, "admin_reset_link"))],
     ]
     if is_super:
@@ -61,6 +62,13 @@ def edit_fields_kb(lang: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=t(lang, "edit_btn_pos"), callback_data="editf:pos")],
         [InlineKeyboardButton(text=t(lang, "edit_btn_done"), callback_data="editdone")],
     ])
+
+
+def delete_confirm_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=t(lang, "del_btn_yes"), callback_data="delyes"),
+        InlineKeyboardButton(text=t(lang, "del_btn_no"), callback_data="delno"),
+    ]])
 
 
 def report_period_kb(lang: str) -> ReplyKeyboardMarkup:
