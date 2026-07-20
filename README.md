@@ -12,11 +12,20 @@ Ortiqcha qatlamlar (DDD/CQRS/Celery/Redis) yo'q — kerak bo'lganda qo'shiladi.
 cp .env.example .env      # BOT_TOKEN va SUPER_ADMIN_IDS ni to'ldiring
 docker compose up --build
 ```
-Compose: `db` (Postgres) + `bot`. `bot` ishga tushganda jadval yaratadi va namuna
-ma'lumot qo'shadi (`scripts/seed.py`, idempotent), keyin polling boshlaydi.
+Compose: `db` (Postgres) + `setup` (idempotent seed) + `bot` + dashboard uchun
+`api` (`http://localhost:8000`).
+
+Dashboard API `.env` dagi `DASHBOARD_EMAIL` / `DASHBOARD_PASSWORD` bilan
+himoyalangan. Frontend originini `DASHBOARD_ORIGINS` ga kiriting. API holati:
+
+```bash
+curl http://localhost:8000/api/health
+```
 
 ## Serverga joylash (deploy — Ubuntu + Docker)
-Bot **polling** ishlaydi — ochiq port, domen yoki Nginx kerak emas.
+Bot **polling** ishlaydi. Dashboard API faqat serverning `127.0.0.1:8000`
+manziliga ochiladi; internetdagi dashboard uchun uni Nginx/Caddy orqali HTTPS
+bilan proxy qiling.
 
 ```bash
 # 1) Docker (agar yo'q bo'lsa)

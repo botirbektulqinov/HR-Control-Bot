@@ -16,14 +16,40 @@ services:
     # Lokalda psql kerak bo'lsa: `docker compose exec db psql -U hr -d hr_control`.
     restart: unless-stopped
 
-  bot:
+  setup:
     build: .
     env_file: .env
     depends_on:
       db:
         condition: service_healthy
-    # seed = jadval yaratish + namuna ma'lumot (idempotent), keyin bot
-    command: sh -c "python -m scripts.seed && python -m app.main"
+    command: python -m scripts.seed
+    restart: "no"
+
+  bot:
+    build: .
+    env_file: .env
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    command: python -m app.main
+    restart: unless-stopped
+
+  api:
+    build: .
+    env_file: .env
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  dashboard:
+    build: ../IshON-Admin
+    depends_on: [api]
+    ports:
+      - "127.0.0.1:3000:80"
     restart: unless-stopped
 
 volumes:
